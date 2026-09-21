@@ -1,4 +1,5 @@
 use crate::config::Settings;
+use crate::fonts;
 use crate::markdown;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
@@ -26,15 +27,18 @@ pub struct Document {
 pub struct BootPayload {
     pub document: Document,
     pub settings: Settings,
+    pub fonts: Vec<String>,
     pub tiling_wm: bool,
 }
 
 #[tauri::command]
 pub fn get_boot(state: State<AppState>) -> BootPayload {
     let settings = state.settings.lock().expect("settings").clone();
+    let light = settings.light_syntax();
     BootPayload {
-        document: load_document(&state.file, &settings.theme),
+        document: load_document(&state.file, light),
         settings,
+        fonts: fonts::installed(),
         tiling_wm: crate::wm::is_tiling_wm(),
     }
 }
@@ -45,16 +49,16 @@ pub fn save_settings(
     state: State<AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let theme_changed = state
+    let (syntax_changed, decorations_changed) = state
         .settings
         .lock()
-        .map(|current| current.theme != settings.theme)
-        .unwrap_or(true);
-    let decorations_changed = state
-        .settings
-        .lock()
-        .map(|current| current.decorations != settings.decorations)
-        .unwrap_or(true);
+        .map(|current| {
+            (
+                current.light_syntax() != settings.light_syntax(),
+                current.decorations != settings.decorations,
+            )
+        })
+        .unwrap_or((true, true));
     crate::config::save(&settings)?;
     *state.settings.lock().expect("settings") = settings.clone();
     if decorations_changed {
@@ -63,22 +67,23 @@ pub fn save_settings(
             let _ = window.set_decorations(!hide);
         }
     }
-    if theme_changed {
+    if syntax_changed {
         let _ = app.emit(
             "document-updated",
-            load_document(&state.file, &settings.theme),
+            load_document(&state.file, settings.light_syntax()),
         );
     }
     Ok(())
 }
 
-pub fn load_document(path: &Path, theme: &str) -> Document {
+pub fn load_document(path: &Path, light_syntax: bool) -> Document {
     let title = path
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("mdread")
         .to_string();
-    let html = markdown::render_file(path, theme).unwrap_or_else(|_| markdown::missing_html());
+    let html =
+        markdown::render_file(path, light_syntax).unwrap_or_else(|_| markdown::missing_html());
     Document {
         html,
         title,
@@ -88,7 +93,9 @@ pub fn load_document(path: &Path, theme: &str) -> Document {
 
 pub fn start_watcher(app: AppHandle) {
     let file = app.state::<AppState>().file.clone();
+    let config_app = app.clone();
     std::thread::spawn(move || watch_loop(app, file));
+    std::thread::spawn(move || watch_config(config_app));
 }
 
 fn watch_loop(app: AppHandle, file: PathBuf) {
@@ -128,8 +135,8 @@ fn watch_loop(app: AppHandle, file: PathBuf) {
         while rx.recv_timeout(Duration::from_millis(120)).is_ok() {}
 
         let Ok(source) = std::fs::read(&file) else {
-            let theme = current_theme(&app);
-            let _ = app.emit("document-updated", load_document(&file, &theme));
+            let light = syntax_is_light(&app);
+            let _ = app.emit("document-updated", load_document(&file, light));
             continue;
         };
         if source == last_source {
@@ -137,8 +144,8 @@ fn watch_loop(app: AppHandle, file: PathBuf) {
         }
         last_source = source;
 
-        let theme = current_theme(&app);
-        let document = load_document(&file, &theme);
+        let light = syntax_is_light(&app);
+        let document = load_document(&file, light);
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.set_title(&document.title);
         }
@@ -146,12 +153,82 @@ fn watch_loop(app: AppHandle, file: PathBuf) {
     }
 }
 
-fn current_theme(app: &AppHandle) -> String {
+fn syntax_is_light(app: &AppHandle) -> bool {
     app.state::<AppState>()
         .settings
         .lock()
-        .map(|s| s.theme.clone())
-        .unwrap_or_else(|_| "dark".into())
+        .map(|settings| settings.light_syntax())
+        .unwrap_or(false)
+}
+
+fn watch_config(app: AppHandle) {
+    let path = crate::config::config_path();
+    if let Some(parent) = path.parent() {
+        if let Err(err) = std::fs::create_dir_all(parent) {
+            eprintln!("mdread: could not create {}: {err}", parent.display());
+            return;
+        }
+    }
+    let Some(parent) = path.parent().map(Path::to_path_buf) else {
+        return;
+    };
+
+    let (tx, rx) = mpsc::channel::<notify::Result<Event>>();
+    let mut watcher: RecommendedWatcher = match notify::recommended_watcher(tx) {
+        Ok(watcher) => watcher,
+        Err(err) => {
+            eprintln!("mdread: config watcher failed: {err}");
+            return;
+        }
+    };
+    if let Err(err) = watcher.watch(&parent, RecursiveMode::NonRecursive) {
+        eprintln!("mdread: could not watch {}: {err}", parent.display());
+        return;
+    }
+    let _watcher = watcher;
+    std::thread::sleep(Duration::from_millis(250));
+    while rx.try_recv().is_ok() {}
+
+    while let Ok(event) = rx.recv() {
+        let Ok(event) = event else { continue };
+        if matches!(event.kind, EventKind::Access(_) | EventKind::Other) {
+            continue;
+        }
+        if !targets_file(&event, &path) {
+            continue;
+        }
+        while rx.recv_timeout(Duration::from_millis(120)).is_ok() {}
+        apply_external_config(&app);
+    }
+}
+
+fn apply_external_config(app: &AppHandle) {
+    let loaded = crate::config::load();
+    let state = app.state::<AppState>();
+    let (syntax_changed, decorations_changed) = {
+        let mut current = state.settings.lock().expect("settings");
+        if *current == loaded {
+            return;
+        }
+        let syntax_changed = current.light_syntax() != loaded.light_syntax();
+        let decorations_changed = current.decorations != loaded.decorations;
+        *current = loaded.clone();
+        (syntax_changed, decorations_changed)
+    };
+    if decorations_changed {
+        if let Some(window) = app.get_webview_window("main") {
+            let hide = loaded.decorations.hide_title_bar();
+            let _ = window.set_decorations(!hide);
+        }
+    }
+    let _ = app.emit("settings-updated", &loaded);
+    if syntax_changed {
+        let file = state.file.clone();
+        let _ = app.emit(
+            "document-updated",
+            load_document(&file, loaded.light_syntax()),
+        );
+    }
 }
 
 fn targets_file(event: &Event, file: &Path) -> bool {

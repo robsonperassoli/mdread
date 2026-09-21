@@ -42,11 +42,13 @@ impl FromStr for DecorationsMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
+    /// A CSS font stack or a single installed family name.
     pub font: String,
     pub size: f32,
+    /// `light`, `dark`, or legacy `sepia`. Anything else follows the background luminance.
     pub theme: String,
     pub bg: String,
     pub fg: String,
@@ -82,6 +84,28 @@ pub fn load() -> Settings {
     toml::from_str(&raw).unwrap_or_default()
 }
 
+impl Settings {
+    /// Light GitHub syntax highlighting, as opposed to the dark theme.
+    pub fn light_syntax(&self) -> bool {
+        match self.theme.as_str() {
+            "light" | "sepia" => true,
+            "dark" => false,
+            _ => channel_sum(&self.bg).is_some_and(|sum| sum > 382),
+        }
+    }
+}
+
+fn channel_sum(color: &str) -> Option<u32> {
+    let hex = color.trim().strip_prefix('#')?;
+    if hex.len() != 6 {
+        return None;
+    }
+    let r = u32::from_str_radix(&hex[0..2], 16).ok()?;
+    let g = u32::from_str_radix(&hex[2..4], 16).ok()?;
+    let b = u32::from_str_radix(&hex[4..6], 16).ok()?;
+    Some(r + g + b)
+}
+
 pub fn save(settings: &Settings) -> Result<(), String> {
     let path = config_path();
     if let Some(parent) = path.parent() {
@@ -89,4 +113,30 @@ pub fn save(settings: &Settings) -> Result<(), String> {
     }
     let raw = toml::to_string_pretty(settings).map_err(|e| e.to_string())?;
     fs::write(path, raw).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn named_themes_pick_syntax() {
+        let mut settings = Settings::default();
+        settings.theme = "dark".into();
+        assert!(!settings.light_syntax());
+        settings.theme = "light".into();
+        assert!(settings.light_syntax());
+        settings.theme = "sepia".into();
+        assert!(settings.light_syntax());
+    }
+
+    #[test]
+    fn unknown_theme_follows_background() {
+        let mut settings = Settings::default();
+        settings.theme = "custom".into();
+        settings.bg = "#05182e".into();
+        assert!(!settings.light_syntax());
+        settings.bg = "#eff1f5".into();
+        assert!(settings.light_syntax());
+    }
 }

@@ -4,14 +4,8 @@ const PRESETS = {
   sepia: { bg: "#f4ecd8", fg: "#5b4636" },
 };
 
-const FONT_PRESETS = [
-  'Georgia, "Iowan Old Style", Palatino, serif',
-  'system-ui, "Segoe UI", sans-serif',
-  'ui-monospace, "JetBrains Mono", "Iosevka", monospace',
-];
-
 const state = {
-  font: FONT_PRESETS[0],
+  font: 'Georgia, "Iowan Old Style", Palatino, serif',
   size: 18,
   theme: "dark",
   bg: PRESETS.dark.bg,
@@ -19,50 +13,120 @@ const state = {
   decorations: "auto",
 };
 
+let fonts = [];
+
 const $ = (id) => document.getElementById(id);
 
 function api() {
   return window.__TAURI__;
 }
 
+function resolvedScheme() {
+  if (state.theme === "light" || state.theme === "sepia") return "light";
+  if (state.theme === "dark") return "dark";
+  return luminance(state.bg) > 382 ? "light" : "dark";
+}
+
+function luminance(color) {
+  const hex = String(color || "").replace("#", "");
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return 0;
+  return (
+    parseInt(hex.slice(0, 2), 16) + parseInt(hex.slice(2, 4), 16) + parseInt(hex.slice(4, 6), 16)
+  );
+}
+
+function quoteFamily(name) {
+  return `"${String(name).replaceAll('"', "")}"`;
+}
+
+function appliedFont() {
+  if (!state.font) return "sans-serif";
+  if (state.font.includes(",")) return state.font;
+  return `${quoteFamily(state.font)}, sans-serif`;
+}
+
+function fontChoices() {
+  const choices = fonts.map((family) => ({ value: family, label: family }));
+  if (state.font && !fonts.includes(state.font)) {
+    choices.unshift({ value: state.font, label: state.font });
+  }
+  return choices;
+}
+
 function applyAppearance() {
   const root = document.documentElement;
-  root.dataset.theme = state.theme === "custom" ? "custom" : state.theme;
-  root.style.setProperty("--md-font", state.font);
+  const scheme = resolvedScheme();
+  root.dataset.theme = state.theme || "dark";
+  root.dataset.scheme = scheme;
+  root.style.setProperty("--md-font", appliedFont());
   root.style.setProperty("--md-size", `${state.size}px`);
-  const colors = state.theme === "custom" ? state : PRESETS[state.theme] || PRESETS.dark;
-  root.style.setProperty("--md-bg", colors.bg);
-  root.style.setProperty("--md-fg", colors.fg);
+  root.style.setProperty("--md-bg", state.bg);
+  root.style.setProperty("--md-fg", state.fg);
 
-  const useLightCss = state.theme === "light" || state.theme === "sepia";
-  $("gh-light").disabled = !useLightCss;
-  $("gh-dark").disabled = useLightCss;
+  $("gh-light").disabled = scheme !== "light";
+  $("gh-dark").disabled = scheme === "light";
+  if (state.theme === "sepia") {
+    $("gh-light").disabled = false;
+    $("gh-dark").disabled = true;
+  }
 
   $("size").value = String(state.size);
-  $("bg").value = toHex(state.bg);
-  $("fg").value = toHex(state.fg);
+  $("font-current").textContent = state.font || "Font";
+  if (!$("font-menu").hidden) renderFontList($("font-filter").value);
 
-  const preset = FONT_PRESETS.includes(state.font);
-  $("font").value = preset ? state.font : "custom";
-  $("custom-font-wrap").hidden = preset;
-  $("custom-font").value = state.font;
-  $("custom-colors").hidden = state.theme !== "custom";
-  $("decorations").value = state.decorations || "auto";
-
-  for (const button of document.querySelectorAll("[data-theme]")) {
-    button.setAttribute("aria-pressed", String(button.dataset.theme === state.theme));
+  for (const button of document.querySelectorAll(".row [data-theme]")) {
+    const preset = PRESETS[button.dataset.theme];
+    const pressed =
+      state.theme === button.dataset.theme &&
+      preset &&
+      state.bg.toLowerCase() === preset.bg &&
+      state.fg.toLowerCase() === preset.fg;
+    button.setAttribute("aria-pressed", String(pressed));
   }
 }
 
-function toHex(color) {
-  if (/^#[0-9a-fA-F]{6}$/.test(color)) return color;
-  return "#888888";
+function renderFontList(filter = "") {
+  const list = $("font-list");
+  const query = filter.trim().toLowerCase();
+  list.replaceChildren();
+  const matches = fontChoices().filter((choice) => choice.label.toLowerCase().includes(query));
+  if (matches.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "empty";
+    empty.textContent = "No matching fonts";
+    list.append(empty);
+    return;
+  }
+  for (const choice of matches) {
+    const item = document.createElement("li");
+    item.setAttribute("role", "option");
+    item.dataset.value = choice.value;
+    item.setAttribute("aria-selected", String(choice.value === state.font));
+    item.textContent = choice.label;
+    item.style.fontFamily = choice.value.includes(",")
+      ? choice.value
+      : `${quoteFamily(choice.value)}, sans-serif`;
+    list.append(item);
+  }
+  list.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
+}
+
+function openFonts() {
+  $("font-menu").hidden = false;
+  $("font-button").setAttribute("aria-expanded", "true");
+  $("font-filter").value = "";
+  renderFontList();
+  $("font-filter").focus();
+}
+
+function closeFonts() {
+  $("font-menu").hidden = true;
+  $("font-button").setAttribute("aria-expanded", "false");
 }
 
 function renderDocument(doc, follow) {
   const article = $("content");
-  const nearBottom =
-    window.innerHeight + window.scrollY >= document.body.scrollHeight - 96;
+  const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 96;
   const y = window.scrollY;
   article.innerHTML = doc.html || "<p>Empty file.</p>";
   if (follow && nearBottom) {
@@ -90,26 +154,33 @@ async function persist() {
 
 function bind() {
   $("gear").addEventListener("click", () => {
-    $("panel").hidden = !$("panel").hidden;
+    const opening = $("panel").hidden;
+    $("panel").hidden = !opening;
+    if (!opening) closeFonts();
   });
 
-  $("font").addEventListener("change", async () => {
-    if ($("font").value === "custom") {
-      $("custom-font-wrap").hidden = false;
-      $("custom-font").focus();
-      return;
-    }
-    state.font = $("font").value;
+  $("font-button").addEventListener("click", () => {
+    if ($("font-menu").hidden) openFonts();
+    else closeFonts();
+  });
+
+  $("font-filter").addEventListener("input", () => {
+    renderFontList($("font-filter").value);
+  });
+
+  $("font-list").addEventListener("click", async (event) => {
+    const item = event.target.closest("[data-value]");
+    if (!item) return;
+    state.font = item.dataset.value;
+    closeFonts();
     applyAppearance();
     await persist();
   });
 
-  $("custom-font").addEventListener("change", async () => {
-    const value = $("custom-font").value.trim();
-    if (!value) return;
-    state.font = value;
-    applyAppearance();
-    await persist();
+  document.addEventListener("pointerdown", (event) => {
+    if ($("font-menu").hidden) return;
+    if ($("font-picker").contains(event.target)) return;
+    closeFonts();
   });
 
   $("size").addEventListener("input", () => {
@@ -118,44 +189,35 @@ function bind() {
   });
   $("size").addEventListener("change", persist);
 
-  $("decorations").addEventListener("change", async () => {
-    state.decorations = $("decorations").value;
-    await persist();
-  });
-
-  for (const button of document.querySelectorAll("[data-theme]")) {
+  for (const button of document.querySelectorAll(".row [data-theme]")) {
     button.addEventListener("click", async () => {
       state.theme = button.dataset.theme;
-      if (state.theme !== "custom" && PRESETS[state.theme]) {
-        state.bg = PRESETS[state.theme].bg;
-        state.fg = PRESETS[state.theme].fg;
+      const preset = PRESETS[state.theme];
+      if (preset) {
+        state.bg = preset.bg;
+        state.fg = preset.fg;
       }
       applyAppearance();
       await persist();
     });
   }
 
-  $("bg").addEventListener("input", () => {
-    state.theme = "custom";
-    state.bg = $("bg").value;
-    applyAppearance();
-  });
-  $("fg").addEventListener("input", () => {
-    state.theme = "custom";
-    state.fg = $("fg").value;
-    applyAppearance();
-  });
-  $("bg").addEventListener("change", persist);
-  $("fg").addEventListener("change", persist);
-
   window.addEventListener("keydown", async (event) => {
+    const typing = event.target.closest && event.target.closest("input, textarea");
     if (event.key === "Escape") {
+      if (!$("font-menu").hidden) {
+        closeFonts();
+        $("font-button").focus();
+        return;
+      }
       if (!$("panel").hidden) {
         $("panel").hidden = true;
         return;
       }
       api()?.window.getCurrentWindow().close();
+      return;
     }
+    if (typing) return;
     if (event.key === "+" || event.key === "=") {
       state.size = Math.min(28, state.size + 1);
       applyAppearance();
@@ -187,20 +249,24 @@ async function main() {
     return;
   }
 
-  try {
-    const boot = await ready.core.invoke("get_boot");
-    Object.assign(state, boot.settings);
-    applyAppearance();
-    renderDocument(boot.document, false);
-  } catch (error) {
-    $("content").textContent = `Failed to load document: ${error}`;
-    return;
-  }
-
   await ready.event.listen("document-updated", (event) => {
     renderDocument(event.payload, true);
     flashLive();
   });
+  await ready.event.listen("settings-updated", (event) => {
+    Object.assign(state, event.payload);
+    applyAppearance();
+  });
+
+  try {
+    const boot = await ready.core.invoke("get_boot");
+    Object.assign(state, boot.settings);
+    fonts = Array.isArray(boot.fonts) ? boot.fonts : [];
+    applyAppearance();
+    renderDocument(boot.document, false);
+  } catch (error) {
+    $("content").textContent = `Failed to load document: ${error}`;
+  }
 }
 
 main().catch((error) => {

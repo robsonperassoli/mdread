@@ -3,6 +3,7 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 mod config;
+mod fonts;
 mod markdown;
 mod watch;
 mod wm;

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" data-scheme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -17,41 +17,40 @@
     </div>
     <aside id="panel" hidden>
       <h2>Reading</h2>
-      <label>
-        Font
-        <select id="font">
-          <option value='Georgia, "Iowan Old Style", Palatino, serif'>Serif</option>
-          <option value='system-ui, "Segoe UI", sans-serif'>Sans</option>
-          <option value='ui-monospace, "JetBrains Mono", "Iosevka", monospace'>Mono</option>
-          <option value="custom">Custom…</option>
-        </select>
-      </label>
-      <label id="custom-font-wrap" hidden>
-        Custom family
-        <input id="custom-font" type="text" placeholder="Literata, serif" />
-      </label>
+      <div class="field">
+        <span id="font-label">Font</span>
+        <div class="picker" id="font-picker">
+          <button
+            id="font-button"
+            type="button"
+            aria-labelledby="font-label"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="font-menu"
+          >
+            <span id="font-current">Font</span>
+          </button>
+          <div id="font-menu" hidden>
+            <input
+              id="font-filter"
+              type="text"
+              placeholder="Filter fonts"
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="Filter fonts"
+            />
+            <ul id="font-list" role="listbox" aria-labelledby="font-label"></ul>
+          </div>
+        </div>
+      </div>
       <label>
         Size
         <input id="size" type="range" min="14" max="28" step="1" />
       </label>
-      <label>
-        Title bar
-        <select id="decorations">
-          <option value="auto">Auto (hide on tiling WMs)</option>
-          <option value="always">Always show</option>
-          <option value="never">Always hide</option>
-        </select>
-      </label>
       <p class="row">
         <button type="button" data-theme="light">Light</button>
         <button type="button" data-theme="dark">Dark</button>
-        <button type="button" data-theme="sepia">Sepia</button>
-        <button type="button" data-theme="custom">Custom</button>
       </p>
-      <div id="custom-colors" hidden>
-        <label>Background <input id="bg" type="color" /></label>
-        <label>Text <input id="fg" type="color" /></label>
-      </div>
     </aside>
     <main>
       <article id="content" class="markdown-body">Loading…</article>

@@ -8,18 +8,18 @@ use std::sync::OnceLock;
 
 const EMPTY: &str = "<p>This file could not be read.</p>";
 
-pub fn render_file(path: &Path, theme: &str) -> Result<String, String> {
+pub fn render_file(path: &Path, light_syntax: bool) -> Result<String, String> {
     let source = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    Ok(render_markdown(&source, path, theme))
+    Ok(render_markdown(&source, path, light_syntax))
 }
 
 pub fn missing_html() -> String {
     EMPTY.to_string()
 }
 
-pub fn render_markdown(source: &str, path: &Path, theme: &str) -> String {
+pub fn render_markdown(source: &str, path: &Path, light_syntax: bool) -> String {
     let body = strip_frontmatter(source);
-    let html = markdown_to_html(body, theme);
+    let html = markdown_to_html(body, light_syntax);
     let html = sanitize(&html);
     inline_local_images(&html, path.parent().unwrap_or_else(|| Path::new(".")))
 }
@@ -42,7 +42,7 @@ fn strip_frontmatter(source: &str) -> &str {
     trimmed
 }
 
-fn markdown_to_html(source: &str, theme: &str) -> String {
+fn markdown_to_html(source: &str, light_syntax: bool) -> String {
     let mut options = Options::default();
     options.extension.strikethrough = true;
     options.extension.table = true;
@@ -53,7 +53,7 @@ fn markdown_to_html(source: &str, theme: &str) -> String {
     options.render.github_pre_lang = true;
     options.render.r#unsafe = false;
 
-    let syntect_theme = if theme == "light" || theme == "sepia" {
+    let syntect_theme = if light_syntax {
         "InspiredGitHub"
     } else {
         "base16-ocean.dark"

@@ -17,9 +17,8 @@ Task:
 
 | Theme | Background |
 | ----- | ---------- |
-| Light | White |
+| Light | GitHub light |
 | Dark | GitHub dark |
-| Sepia | Paper |
 
 ## Code
 
