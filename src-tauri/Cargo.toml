@@ -1,0 +1,34 @@
+[package]
+name = "mdread"
+version = "0.1.0"
+description = "Read markdown in a clean desktop window"
+authors = ["Robson Perassoli <robsonperassoli@gmail.com>"]
+edition = "2021"
+rust-version = "1.88"
+
+[lib]
+name = "mdread_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+ammonia = "4"
+base64 = "0.22"
+clap = { version = "4", features = ["derive"] }
+comrak = { version = "0.55", features = ["syntect"] }
+dirs = "6"
+notify = "7"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+toml = "0.8"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
