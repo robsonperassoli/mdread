@@ -1,0 +1,48 @@
+#!/bin/bash
+# Install mdread's optional Omarchy hooks, theme template, and app menu entry.
+# mdread itself only reads ~/.config/mdread/config.toml.
+
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")" && pwd)"
+
+if ! command -v omarchy >/dev/null; then
+  echo "mdread: omarchy is not on PATH" >&2
+  exit 1
+fi
+
+themed="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/themed"
+apps="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+icons="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps"
+
+mkdir -p "$themed" "$apps" "$icons"
+bin="${XDG_BIN_HOME:-$HOME/.local/bin}/mdread"
+if [[ ! -x $bin ]]; then
+  bin="$(command -v mdread || true)"
+fi
+if [[ -z $bin ]]; then
+  echo "mdread: install the binary first (mise run install)" >&2
+  exit 1
+fi
+
+cp "$root/mdread.toml.tpl" "$themed/mdread.toml.tpl"
+cp "$root/mdread.svg" "$icons/mdread.svg"
+sed "s|^Exec=.*|Exec=$bin %f|" "$root/mdread.desktop" >"$apps/mdread.desktop"
+
+omarchy hook install theme-set "$root/mdread-theme"
+omarchy hook install font-set "$root/mdread-font"
+
+if command -v update-desktop-database >/dev/null; then
+  update-desktop-database "$apps"
+fi
+if command -v gtk-update-icon-cache >/dev/null; then
+  gtk-update-icon-cache -f "${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor" >/dev/null 2>&1 || true
+fi
+
+"$root/mdread-theme"
+font="$(omarchy font current 2>/dev/null || true)"
+if [[ -n $font ]]; then
+  "$root/mdread-font" "$font"
+fi
+
+echo "installed Omarchy theme/font hooks and the mdread app menu entry"

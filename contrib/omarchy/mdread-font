@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# omarchy: store the desktop monospace font in mdread's own config.
+# The font name is $1, passed by `omarchy font set`.
+
+set -euo pipefail
+
+font="${1:-}"
+[[ -n $font ]] || exit 0
+
+config="${XDG_CONFIG_HOME:-$HOME/.config}/mdread/config.toml"
+
+MDREAD_CONFIG="$config" \
+  MDREAD_SET_font="$font" \
+  python3 - <<'PY'
+import os
+import re
+from pathlib import Path
+
+path = Path(os.environ["MDREAD_CONFIG"])
+path.parent.mkdir(parents=True, exist_ok=True)
+text = path.read_text() if path.exists() else ""
+
+def quote(value: str) -> str:
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+def set_key(text: str, key: str, rendered: str) -> str:
+    line = f"{key} = {rendered}"
+    pattern = re.compile(rf"(?m)^{re.escape(key)}[ \t]*=.*$")
+    if pattern.search(text):
+        return pattern.sub(line, text, count=1)
+    if text and not text.endswith("\n"):
+        text += "\n"
+    return text + line + "\n"
+
+if not text.strip():
+    text = "\n".join(
+        [
+            'font = "Georgia, \\"Iowan Old Style\\", Palatino, serif"',
+            "size = 18.0",
+            'theme = "dark"',
+            'bg = "#0d1117"',
+            'fg = "#f0f6fc"',
+            'decorations = "auto"',
+            "",
+        ]
+    )
+
+for key, value in os.environ.items():
+    if key.startswith("MDREAD_SET_") and value:
+        text = set_key(text, key.removeprefix("MDREAD_SET_"), quote(value))
+
+if not text.endswith("\n"):
+    text += "\n"
+path.write_text(text)
+PY

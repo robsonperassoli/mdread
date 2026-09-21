@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=mdread
+Comment=Read markdown in a clean window
+Exec=mdread %f
+Icon=mdread
+Terminal=false
+StartupNotify=true
+StartupWMClass=mdread
+Categories=Office;Viewer;
+MimeType=text/markdown;text/x-markdown;
+Keywords=markdown;md;reader;

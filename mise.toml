@@ -23,3 +23,7 @@ install -Dm755 src-tauri/target/release/mdread "$HOME/.local/bin/mdread"
 echo "installed $HOME/.local/bin/mdread"
 "$HOME/.local/bin/mdread" --help | head -n 4
 """
+
+[tasks.setup-omarchy]
+description = "Install Omarchy theme/font hooks and the app menu entry"
+run = "contrib/omarchy/setup"
