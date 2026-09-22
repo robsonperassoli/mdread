@@ -1,5 +1,4 @@
-//! Installed font families, from fontconfig. The app does not follow a desktop
-//! theme; whatever name is stored in the config is the family that gets used.
+//! Installed font families, from fontconfig.
 
 use std::process::Command;
 use std::sync::Mutex;

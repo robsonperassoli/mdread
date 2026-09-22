@@ -9,30 +9,40 @@ state="${XDG_STATE_HOME:-$HOME/.local/state}"
 config="${XDG_CONFIG_HOME:-$HOME/.config}/mdread/config.toml"
 snippet="$state/omarchy/current/theme/mdread.toml"
 
-theme=""
+mode=""
 bg=""
 fg=""
 
 if [[ -f $snippet ]]; then
-  theme=$(sed -n 's/^theme[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' "$snippet" | head -n1)
+  mode=$(sed -n 's/^theme[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' "$snippet" | head -n1)
+  if [[ -z $mode ]]; then
+    mode=$(sed -n 's/^mode[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' "$snippet" | head -n1)
+  fi
   bg=$(sed -n 's/^bg[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' "$snippet" | head -n1)
+  if [[ -z $bg ]]; then
+    bg=$(awk '/^\[custom\]/{p=1;next} /^\[/{p=0} p && $1=="background"{print}' "$snippet" | sed -n 's/.*=[[:space:]]*"\(.*\)"/\1/p' | head -n1)
+  fi
   fg=$(sed -n 's/^fg[[:space:]]*=[[:space:]]*"\(.*\)"/\1/p' "$snippet" | head -n1)
+  if [[ -z $fg ]]; then
+    fg=$(awk '/^\[custom\]/{p=1;next} /^\[/{p=0} p && $1=="foreground"{print}' "$snippet" | sed -n 's/.*=[[:space:]]*"\(.*\)"/\1/p' | head -n1)
+  fi
 elif command -v omarchy-theme-color >/dev/null; then
-  theme=$(omarchy-theme-color mode || true)
+  mode=$(omarchy-theme-color mode || true)
   bg=$(omarchy-theme-color background || true)
   fg=$(omarchy-theme-color foreground || true)
 fi
 
-theme=${theme//$'\n'/}
+mode=${mode//$'\n'/}
 bg=${bg//$'\n'/}
 fg=${fg//$'\n'/}
 
-[[ -n $theme && -n $bg && -n $fg ]] || exit 0
+[[ -n $mode && -n $bg && -n $fg ]] || exit 0
 
 MDREAD_CONFIG="$config" \
-  MDREAD_SET_theme="$theme" \
-  MDREAD_SET_bg="$bg" \
-  MDREAD_SET_fg="$fg" \
+  MDREAD_SET_theme="custom" \
+  MDREAD_CUSTOM_mode="$mode" \
+  MDREAD_CUSTOM_background="$bg" \
+  MDREAD_CUSTOM_foreground="$fg" \
   python3 - <<'PY'
 import os
 import re
@@ -54,14 +64,37 @@ def set_key(text: str, key: str, rendered: str) -> str:
         text += "\n"
     return text + line + "\n"
 
+def set_table_key(text: str, table: str, key: str, rendered: str) -> str:
+    header = f"[{table}]"
+    line = f"{key} = {rendered}"
+    if header not in text:
+        if text and not text.endswith("\n"):
+            text += "\n"
+        if text and not text.endswith("\n\n"):
+            text += "\n"
+        return text + header + "\n" + line + "\n"
+    start = text.find(header)
+    rest = text[start + len(header) :]
+    next_table = re.search(r"\n\[", rest)
+    block = rest if next_table is None else rest[: next_table.start()]
+    pattern = re.compile(rf"(?m)^{re.escape(key)}[ \t]*=.*$")
+    if pattern.search(block):
+        new_block = pattern.sub(line, block, count=1)
+    else:
+        new_block = block
+        if not new_block.endswith("\n"):
+            new_block += "\n"
+        new_block += line + "\n"
+    return text[: start + len(header)] + new_block + (rest[len(block) :] if next_table else "")
+
 if not text.strip():
     text = "\n".join(
         [
-            'font = "Georgia, \\"Iowan Old Style\\", Palatino, serif"',
             "size = 18.0",
-            'theme = "dark"',
-            'bg = "#0d1117"',
-            'fg = "#f0f6fc"',
+            "radius = 6.0",
+            "radius_lg = 8.0",
+            "shadow = true",
+            'theme = "custom"',
             'decorations = "auto"',
             "",
         ]
@@ -70,6 +103,10 @@ if not text.strip():
 for key, value in os.environ.items():
     if key.startswith("MDREAD_SET_") and value:
         text = set_key(text, key.removeprefix("MDREAD_SET_"), quote(value))
+
+for key, value in os.environ.items():
+    if key.startswith("MDREAD_CUSTOM_") and value:
+        text = set_table_key(text, "custom", key.removeprefix("MDREAD_CUSTOM_"), quote(value))
 
 if not text.endswith("\n"):
     text += "\n"

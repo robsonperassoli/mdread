@@ -4,28 +4,29 @@ version = "0.1.0"
 description = "Read markdown in a clean desktop window"
 authors = ["Robson Perassoli <robsonperassoli@gmail.com>"]
 edition = "2021"
-rust-version = "1.88"
-
-[lib]
-name = "mdread_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
-
-[build-dependencies]
-tauri-build = { version = "2", features = [] }
+rust-version = "1.98"
 
 [dependencies]
-ammonia = "4"
-base64 = "0.22"
 clap = { version = "4", features = ["derive"] }
-comrak = { version = "0.55", features = ["syntect"] }
 dirs = "6"
+gpui-kit = { version = "0.6", features = [
+    "tree-sitter-bash",
+    "tree-sitter-go",
+    "tree-sitter-html",
+    "tree-sitter-javascript",
+    "tree-sitter-markdown",
+    "tree-sitter-python",
+    "tree-sitter-rust",
+    "tree-sitter-toml",
+    "tree-sitter-typescript",
+    "tree-sitter-yaml",
+] }
 notify = "7"
 regex = "1"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tauri = { version = "2", features = [] }
-toml = "0.8"
 rfd = "0.15"
+serde = { version = "1", features = ["derive"] }
+smol = "2"
+toml = "0.8"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

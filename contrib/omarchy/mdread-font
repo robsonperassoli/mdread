@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# omarchy: store the desktop monospace font in mdread's own config.
+# omarchy: store the desktop font in mdread's own config.
 # The font name is $1, passed by `omarchy font set`.
 
 set -euo pipefail
@@ -36,11 +36,11 @@ def set_key(text: str, key: str, rendered: str) -> str:
 if not text.strip():
     text = "\n".join(
         [
-            'font = "Georgia, \\"Iowan Old Style\\", Palatino, serif"',
             "size = 18.0",
-            'theme = "dark"',
-            'bg = "#0d1117"',
-            'fg = "#f0f6fc"',
+            "radius = 6.0",
+            "radius_lg = 8.0",
+            "shadow = true",
+            'theme = "Default Dark"',
             'decorations = "auto"',
             "",
         ]

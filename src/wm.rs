@@ -1,8 +1,7 @@
-//! Detect tiling window managers so we can drop GTK client-side decorations.
+//! Detect tiling window managers so we can drop client-side decorations.
 //!
-//! Wayland has no portable "am I tiled?" query for GTK3/WebKit. Other Linux apps
-//! (terminals, Electron, IPTVChecker, compositor helpers) therefore treat the
-//! *session* as tiling: compositor sockets first, then colon-separated
+//! Wayland has no portable "am I tiled?" query. Other Linux apps therefore
+//! treat the *session* as tiling: compositor sockets first, then colon-separated
 //! `XDG_CURRENT_DESKTOP` / `XDG_SESSION_DESKTOP` tokens.
 
 use std::env;

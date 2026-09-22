@@ -1,8 +1,7 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use clap::Parser;
-use mdread_lib::DecorationsMode;
+use mdread::DecorationsMode;
 use std::io::IsTerminal;
 use std::path::PathBuf;
 
@@ -36,7 +35,7 @@ fn main() {
         detach();
     }
 
-    mdread_lib::run(file, args.decorations);
+    mdread::run(file, args.decorations);
 }
 
 fn resolve_file(file: Option<PathBuf>) -> Option<PathBuf> {
@@ -67,14 +66,13 @@ fn should_detach(foreground_flag: bool) -> bool {
     if foreground_flag || cfg!(debug_assertions) {
         return false;
     }
-    // uwsm/gtk-launch own the process; daemonizing makes systemd kill the window.
     std::io::stdin().is_terminal()
 }
 
 fn detach() {
     #[cfg(unix)]
     {
-        // SAFETY: called once, before GTK/Tauri is initialized.
+        // SAFETY: called once, before the GPU window is initialized.
         let rc = unsafe { libc::daemon(1, 0) };
         if rc != 0 {
             eprintln!(
@@ -88,6 +86,5 @@ fn detach() {
 
 #[cfg(debug_assertions)]
 fn default_sample() -> PathBuf {
-    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest.join("../examples/sample.md")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples/sample.md")
 }

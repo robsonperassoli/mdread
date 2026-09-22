@@ -1,25 +1,24 @@
 [tools]
-rust = { version = "1.88", components = ["rustfmt", "clippy"] }
-"cargo:tauri-cli" = "2"
+rust = { version = "1.98", components = ["rustfmt", "clippy"] }
 
 [tasks.dev]
 description = "Open the sample markdown file in the reader"
-run = "cargo tauri dev"
+run = "cargo run -- {{arg(name='file', i=true)}}"
 
 [tasks.open]
 description = "Open a specific markdown file in the reader"
-run = "cargo tauri dev -- -- {{arg(name='file')}}"
+run = "cargo run -- {{arg(name='file')}}"
 
 [tasks.build]
-description = "Release-build mdread and package the deb for publishing"
-run = "cargo tauri build"
+description = "Release-build mdread"
+run = "cargo build --release"
 
 [tasks.install]
 description = "Release-build and install mdread to ~/.local/bin"
 run = """
-cargo tauri build --no-bundle
+cargo build --release
 mkdir -p "$HOME/.local/bin"
-install -Dm755 src-tauri/target/release/mdread "$HOME/.local/bin/mdread"
+install -Dm755 target/release/mdread "$HOME/.local/bin/mdread"
 echo "installed $HOME/.local/bin/mdread"
 "$HOME/.local/bin/mdread" --help | head -n 4
 """
