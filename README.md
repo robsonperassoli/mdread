@@ -1,66 +1,47 @@
 # mdread
 
-Open a markdown file in a clean reading window. GitHub-flavored formatting, native GPU rendering (GPUI Kit), in-app font/size/theme controls, and live reload so a tiled plan stays in sync while an agent edits it.
+A quiet desktop window for reading markdown. GitHub-flavored text, a font and theme you can change, and live reload when the file on disk changes. Leave it beside an editor or an agent and keep reading.
 
-## Setup
+![mdread showing the sample document](docs/screenshot.png)
 
-The project uses [mise](https://mise.jdx.dev) for the Rust toolchain.
+## Install
+
+Linux x86_64 builds are on the [releases page](https://github.com/robsonperassoli/mdread/releases). The binary needs glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora, Arch, and Omarchy).
 
 ```bash
-git clone https://github.com/robsonperassoli/mdread.git
-cd mdread
-mise trust
-mise install
+tar -xzf mdread-x86_64-linux.tar.gz
+install -Dm755 mdread-x86_64-linux/mdread ~/.local/bin/mdread
 ```
 
-Linux needs a working **Vulkan** loader (`libvulkan1`) and fontconfig. WebKitGTK is no longer required.
+`~/.local/bin` needs to be on your `PATH`.
+
+mdread draws with Vulkan, so the machine needs a Vulkan loader (`libvulkan1` on Debian and Ubuntu) and a working GPU driver. The font list uses `fc-list` from fontconfig.
 
 ## Use
 
-Dev loop (unoptimized):
-
 ```bash
-mise run dev
-mise run open -- ~/.cursor/plans/your-plan.plan.md
+mdread notes.md
 ```
 
-Install the current tree on this machine (`~/.local/bin/mdread`):
+Run `mdread` with no path to pick a file. When the file changes on disk, the page re-renders. If you are already near the bottom, new content stays in view. YAML frontmatter stays hidden, so plan files stay readable.
 
-```bash
-mise run install
-mdread ~/.cursor/plans/some-plan.plan.md
-```
-
-On Omarchy, also register the theme/font hooks and the app menu entry:
-
-```bash
-mise run install && mise run setup-omarchy
-```
-
-`mise run install` puts the binary on `PATH`. `mise run setup-omarchy` copies `contrib/omarchy/` into place: the `mdread.toml.tpl` template, `theme-set` / `font-set` hooks, and a `.desktop` launcher with icon. After that, `omarchy theme set` and `omarchy font set` rewrite `~/.config/mdread/config.toml`; mdread reloads it. Opening **mdread** from the app menu (or running `mdread` with no file) shows a file picker. The installed binary returns to the shell as soon as the window is up; pass `--foreground` to keep it attached.
-
-Leave that window tiled next to the terminal agent. On tiling window managers (Hyprland, Sway, i3, niri, …) mdread hides the title bar — close/minimize/maximize are dead weight because the compositor already owns the window. Floating desktops keep the title bar so you can drag and close. Override with `--decorations always|never` or `decorations` in the config file. When the file changes on disk (a plan update, a README rewrite), the reader re-renders. If you are near the bottom, it follows new content. YAML frontmatter is hidden, so Cursor plan files stay readable.
-
-## Reading controls
-
-The **Aa** button opens:
-
-- Theme: bundled GPUI Kit themes, plus **custom**
-- Font: **System** (platform UI font) or any installed family
-- Size
-- Radius and shadows
-- When **custom** is selected: color pickers for background, foreground, muted, border, and primary
-
-Choices are saved in `~/.config/mdread/config.toml`. The window reloads that file when it changes, so another program can recolor mdread without the reader knowing about it.
+The **Aa** button sets the theme, font, size, corner radius, and shadows. Choices are saved in `~/.config/mdread/config.toml`, and the window reloads that file when it changes.
 
 ```toml
-theme = "custom"
-# font omitted → system UI font
+theme = "Default Dark"
 size = 18.0
 radius = 6.0
 radius_lg = 8.0
 shadow = true
 decorations = "auto" # auto | always | never
+```
+
+`auto` hides the title bar on tiling window managers (Hyprland, Sway, i3, niri) and keeps it on floating desktops. `always` and `never` override that. The same switch exists as `--decorations always|never`.
+
+Omit `font` to use the system UI font. Set `theme = "custom"` to pick your own colors:
+
+```toml
+theme = "custom"
 
 [custom]
 mode = "dark"
@@ -71,4 +52,16 @@ border = "#30363d"
 primary = "#4493f8"
 ```
 
-`auto` hides the title bar on tiling window managers. Omarchy theme hooks write `theme = "custom"` and the `[custom]` palette. A saved `sepia` or GitHub `light`/`dark` config from the old WebView build still loads.
+A release build returns to the shell once the window is up. Pass `--foreground` to keep the process attached.
+
+## Omarchy
+
+Omarchy can recolor mdread and match its font when you change the desktop theme. That setup is optional: [Omarchy integration](docs/omarchy.md).
+
+## Development
+
+Building from source, the mise tasks, and tests: [Development](docs/development.md).
+
+## License
+
+[MIT](LICENSE)

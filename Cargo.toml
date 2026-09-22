@@ -3,6 +3,8 @@ name = "mdread"
 version = "0.1.0"
 description = "Read markdown in a clean desktop window"
 authors = ["Robson Perassoli <robsonperassoli@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/robsonperassoli/mdread"
 edition = "2021"
 rust-version = "1.98"
 
